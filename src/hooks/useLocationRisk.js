@@ -1,6 +1,9 @@
 import { useState, useCallback } from 'react';
 
 const RATE_LIMIT_KEY = 'hawkins_location_rate_limit';
+const API_KEY = import.meta.env.VITE_OPENMETEO_API_KEY;
+const API_BASE = API_KEY ? 'https://customer-api.open-meteo.com/v1' : 'https://api.open-meteo.com/v1';
+const GEOCODE_BASE = API_KEY ? 'https://customer-geocoding-api.open-meteo.com/v1' : 'https://geocoding-api.open-meteo.com/v1';
 
 /**
  * Analyzes interdimensional risk for a given location based on
@@ -95,7 +98,7 @@ export const useLocationRisk = () => {
 
   // Geocode a location string to coordinates
   const geocodeLocation = async (query) => {
-    const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=1&language=en&format=json`;
+    const url = `${GEOCODE_BASE}/search?name=${encodeURIComponent(query)}&count=1&language=en&format=json${API_KEY ? `&apikey=${API_KEY}` : ''}`;
     const response = await fetch(url);
     if (response.status === 429) {
       localStorage.setItem(RATE_LIMIT_KEY, String(Date.now() + 30 * 60 * 1000));
@@ -111,7 +114,7 @@ export const useLocationRisk = () => {
 
   // Fetch weather data for coordinates
   const fetchWeather = async (lat, lon) => {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,surface_pressure,wind_speed_10m,precipitation,weather_code,cloud_cover,apparent_temperature&daily=sunrise,sunset&timezone=auto`;
+    const url = `${API_BASE}/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,surface_pressure,wind_speed_10m,precipitation,weather_code,cloud_cover,apparent_temperature&daily=sunrise,sunset&timezone=auto${API_KEY ? `&apikey=${API_KEY}` : ''}`;
     const response = await fetch(url);
     if (response.status === 429) {
       localStorage.setItem(RATE_LIMIT_KEY, String(Date.now() + 30 * 60 * 1000));

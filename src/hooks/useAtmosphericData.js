@@ -3,6 +3,8 @@ import { useState, useEffect, useRef } from 'react';
 const CACHE_KEY = 'hawkins_atmospheric_cache';
 const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes cache
 const RATE_LIMIT_KEY = 'hawkins_atmospheric_rate_limit';
+const API_KEY = import.meta.env.VITE_OPENMETEO_API_KEY;
+const API_BASE = API_KEY ? 'https://customer-api.open-meteo.com/v1' : 'https://api.open-meteo.com/v1';
 
 /**
  * Fetches real atmospheric data from Open-Meteo API and transforms it into
@@ -82,7 +84,7 @@ export const useAtmosphericData = (easterEggState = null) => {
       hasFetched.current = true;
 
       try {
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=${location.lat}&longitude=${location.lon}&current=temperature_2m,relative_humidity_2m,surface_pressure,wind_speed_10m,precipitation,weather_code,cloud_cover&temperature_unit=celsius&wind_speed_unit=kmh`;
+        const url = `${API_BASE}/forecast?latitude=${location.lat}&longitude=${location.lon}&current=temperature_2m,relative_humidity_2m,surface_pressure,wind_speed_10m,precipitation,weather_code,cloud_cover&temperature_unit=celsius&wind_speed_unit=kmh${API_KEY ? `&apikey=${API_KEY}` : ''}`;
 
         const response = await fetch(url);
 
@@ -130,7 +132,7 @@ export const useAtmosphericData = (easterEggState = null) => {
 
       const fetchData = async () => {
         try {
-          const url = `https://api.open-meteo.com/v1/forecast?latitude=${location.lat}&longitude=${location.lon}&current=temperature_2m,relative_humidity_2m,surface_pressure,wind_speed_10m,precipitation,weather_code,cloud_cover&temperature_unit=celsius&wind_speed_unit=kmh`;
+          const url = `${API_BASE}/forecast?latitude=${location.lat}&longitude=${location.lon}&current=temperature_2m,relative_humidity_2m,surface_pressure,wind_speed_10m,precipitation,weather_code,cloud_cover&temperature_unit=celsius&wind_speed_unit=kmh${API_KEY ? `&apikey=${API_KEY}` : ''}`;
 
           const response = await fetch(url);
 

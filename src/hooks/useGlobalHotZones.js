@@ -3,6 +3,8 @@ import { useState, useEffect, useRef } from 'react';
 const CACHE_KEY = 'hawkins_hotzones_cache';
 const CACHE_DURATION = 15 * 60 * 1000; // 15 minutes cache
 const RATE_LIMIT_KEY = 'hawkins_hotzones_rate_limit';
+const API_KEY = import.meta.env.VITE_OPENMETEO_API_KEY;
+const API_BASE = API_KEY ? 'https://customer-api.open-meteo.com/v1' : 'https://api.open-meteo.com/v1';
 
 /**
  * Fetches real-time global seismic AND atmospheric data to identify
@@ -49,7 +51,7 @@ export const useGlobalHotZones = () => {
     }
 
     try {
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,surface_pressure,wind_speed_10m,precipitation,weather_code,cloud_cover&daily=sunrise,sunset&timezone=auto`;
+      const url = `${API_BASE}/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,surface_pressure,wind_speed_10m,precipitation,weather_code,cloud_cover&daily=sunrise,sunset&timezone=auto${API_KEY ? `&apikey=${API_KEY}` : ''}`;
       const response = await fetch(url);
 
       if (response.status === 429) {
