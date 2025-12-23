@@ -1,5 +1,7 @@
 import { useState, useCallback } from 'react';
 
+const RATE_LIMIT_KEY = 'hawkins_location_rate_limit';
+
 /**
  * Analyzes interdimensional risk for a given location based on
  * real seismic and atmospheric data. Because science.
@@ -9,10 +11,23 @@ export const useLocationRisk = () => {
   const [scanResult, setScanResult] = useState(null);
   const [error, setError] = useState(null);
 
+  const getRateLimitedUntil = () => {
+    try {
+      const until = localStorage.getItem(RATE_LIMIT_KEY);
+      return until ? parseInt(until, 10) : 0;
+    } catch {
+      return 0;
+    }
+  };
+
   // Geocode a location string to coordinates
   const geocodeLocation = async (query) => {
     const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=1&language=en&format=json`;
     const response = await fetch(url);
+    if (response.status === 429) {
+      localStorage.setItem(RATE_LIMIT_KEY, String(Date.now() + 30 * 60 * 1000));
+      throw new Error('API rate limited - try again later');
+    }
     if (!response.ok) throw new Error('Geocoding failed');
     const data = await response.json();
     if (!data.results || data.results.length === 0) {
@@ -25,6 +40,10 @@ export const useLocationRisk = () => {
   const fetchWeather = async (lat, lon) => {
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,surface_pressure,wind_speed_10m,precipitation,weather_code,cloud_cover,apparent_temperature&daily=sunrise,sunset&timezone=auto`;
     const response = await fetch(url);
+    if (response.status === 429) {
+      localStorage.setItem(RATE_LIMIT_KEY, String(Date.now() + 30 * 60 * 1000));
+      throw new Error('API rate limited - try again later');
+    }
     if (!response.ok) throw new Error('Weather fetch failed');
     return response.json();
   };
@@ -159,6 +178,12 @@ export const useLocationRisk = () => {
 
   // Main scan function
   const scanLocation = useCallback(async (locationQuery) => {
+    // Check rate limit before starting
+    if (Date.now() < getRateLimitedUntil()) {
+      setError('API rate limited - try again later');
+      return null;
+    }
+
     setIsScanning(true);
     setError(null);
     setScanResult(null);

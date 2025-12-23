@@ -1,15 +1,24 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 const CACHE_KEY = 'hawkins_atmospheric_cache';
 const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes cache
+const RATE_LIMIT_KEY = 'hawkins_atmospheric_rate_limit';
 
 /**
  * Fetches real atmospheric data from Open-Meteo API and transforms it into
  * ominous readings for the Hawkins Terminal.
- *
- * Real weather = real dimensional instability indicators.
  */
 export const useAtmosphericData = (easterEggState = null) => {
+  // Check rate limit from localStorage (persists across page loads)
+  const getRateLimitedUntil = () => {
+    try {
+      const until = localStorage.getItem(RATE_LIMIT_KEY);
+      return until ? parseInt(until, 10) : 0;
+    } catch {
+      return 0;
+    }
+  };
+
   // Try to load cached data on init
   const getCachedData = () => {
     try {
@@ -33,9 +42,9 @@ export const useAtmosphericData = (easterEggState = null) => {
   const [isLive, setIsLive] = useState(!!cachedResult);
   const [error, setError] = useState(null);
   const [lastFetch, setLastFetch] = useState(cachedResult ? new Date() : null);
-  const rateLimitedUntil = useRef(0);
+  const hasFetched = useRef(false);
 
-  // Try to get user's location
+  // Try to get user's location (only once)
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -47,77 +56,115 @@ export const useAtmosphericData = (easterEggState = null) => {
           setLocationName('LOCAL SENSOR ARRAY');
         },
         () => {
-          // Geolocation denied, use default (Hawkins area)
           console.log('Geolocation denied, using Hawkins, IN coordinates');
         }
       );
     }
   }, []);
 
-  // Fetch atmospheric data from Open-Meteo
-  const fetchAtmospheric = useCallback(async () => {
-    // Skip if rate limited
-    if (Date.now() < rateLimitedUntil.current) {
-      console.log('Atmospheric API: Rate limited, using cached data');
-      return atmosphericData;
-    }
-
-    try {
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${location.lat}&longitude=${location.lon}&current=temperature_2m,relative_humidity_2m,surface_pressure,wind_speed_10m,precipitation,weather_code,cloud_cover&temperature_unit=celsius&wind_speed_unit=kmh`;
-
-      const response = await fetch(url);
-
-      // Handle rate limiting
-      if (response.status === 429) {
-        console.warn('Open-Meteo API rate limited, backing off for 15 minutes');
-        rateLimitedUntil.current = Date.now() + 15 * 60 * 1000;
-        // Keep existing data as "live" if we have it
-        if (atmosphericData) {
-          setIsLive(true);
-        }
-        return atmosphericData;
-      }
-
-      if (!response.ok) throw new Error('Open-Meteo API unavailable');
-
-      const data = await response.json();
-      setAtmosphericData(data.current);
-      setLastFetch(new Date());
-      setIsLive(true);
-      setError(null);
-
-      // Cache the successful response
-      try {
-        localStorage.setItem(CACHE_KEY, JSON.stringify({
-          data: data.current,
-          timestamp: Date.now(),
-          loc: locationName,
-        }));
-      } catch (e) {
-        // Ignore cache write errors
-      }
-
-      return data.current;
-    } catch (err) {
-      console.warn('Open-Meteo API error:', err.message);
-      setError(err.message);
-      // Keep live status if we have cached data
-      if (!atmosphericData) {
-        setIsLive(false);
-      }
-      return null;
-    }
-  }, [location, atmosphericData, locationName]);
-
-  // Fetch on mount and every 10 minutes (reduced to avoid rate limits)
+  // Fetch atmospheric data - runs once on mount
   useEffect(() => {
-    fetchAtmospheric();
-    const interval = setInterval(fetchAtmospheric, 10 * 60 * 1000);
+    // Don't fetch if we already have cached data or already fetched
+    if (hasFetched.current) return;
+    if (cachedResult?.data) {
+      hasFetched.current = true;
+      return;
+    }
+
+    // Check rate limit
+    if (Date.now() < getRateLimitedUntil()) {
+      console.log('Atmospheric API: Rate limited, skipping fetch');
+      hasFetched.current = true;
+      return;
+    }
+
+    const fetchData = async () => {
+      hasFetched.current = true;
+
+      try {
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${location.lat}&longitude=${location.lon}&current=temperature_2m,relative_humidity_2m,surface_pressure,wind_speed_10m,precipitation,weather_code,cloud_cover&temperature_unit=celsius&wind_speed_unit=kmh`;
+
+        const response = await fetch(url);
+
+        if (response.status === 429) {
+          console.warn('Open-Meteo API rate limited, backing off for 30 minutes');
+          localStorage.setItem(RATE_LIMIT_KEY, String(Date.now() + 30 * 60 * 1000));
+          return;
+        }
+
+        if (!response.ok) throw new Error('Open-Meteo API unavailable');
+
+        const data = await response.json();
+        setAtmosphericData(data.current);
+        setLastFetch(new Date());
+        setIsLive(true);
+        setError(null);
+
+        // Cache the successful response
+        try {
+          localStorage.setItem(CACHE_KEY, JSON.stringify({
+            data: data.current,
+            timestamp: Date.now(),
+            loc: locationName,
+          }));
+        } catch (e) {
+          // Ignore cache write errors
+        }
+      } catch (err) {
+        console.warn('Open-Meteo API error:', err.message);
+        setError(err.message);
+      }
+    };
+
+    fetchData();
+  }, [location.lat, location.lon, locationName]);
+
+  // Set up interval for periodic refresh (every 10 minutes)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // Check rate limit before fetching
+      if (Date.now() < getRateLimitedUntil()) {
+        console.log('Atmospheric API: Rate limited, skipping periodic fetch');
+        return;
+      }
+
+      const fetchData = async () => {
+        try {
+          const url = `https://api.open-meteo.com/v1/forecast?latitude=${location.lat}&longitude=${location.lon}&current=temperature_2m,relative_humidity_2m,surface_pressure,wind_speed_10m,precipitation,weather_code,cloud_cover&temperature_unit=celsius&wind_speed_unit=kmh`;
+
+          const response = await fetch(url);
+
+          if (response.status === 429) {
+            console.warn('Open-Meteo API rate limited, backing off for 30 minutes');
+            localStorage.setItem(RATE_LIMIT_KEY, String(Date.now() + 30 * 60 * 1000));
+            return;
+          }
+
+          if (!response.ok) return;
+
+          const data = await response.json();
+          setAtmosphericData(data.current);
+          setLastFetch(new Date());
+          setIsLive(true);
+
+          localStorage.setItem(CACHE_KEY, JSON.stringify({
+            data: data.current,
+            timestamp: Date.now(),
+            loc: locationName,
+          }));
+        } catch (err) {
+          console.warn('Open-Meteo periodic fetch error:', err.message);
+        }
+      };
+
+      fetchData();
+    }, 10 * 60 * 1000);
+
     return () => clearInterval(interval);
-  }, [fetchAtmospheric]);
+  }, [location.lat, location.lon, locationName]);
 
   // Transform real data into Hawkins Terminal readings
-  const getProcessedReadings = useCallback(() => {
+  const getProcessedReadings = () => {
     if (!atmosphericData || !isLive) {
       // Fallback simulated data
       return {
@@ -140,14 +187,14 @@ export const useAtmosphericData = (easterEggState = null) => {
     const weatherCode = atmosphericData.weather_code;
 
     // Determine anomaly levels based on weather conditions
-    const isStormy = weatherCode >= 95; // Thunderstorm codes
+    const isStormy = weatherCode >= 95;
     const isExtreme = temp < -10 || temp > 40 || windSpeed > 50;
     const isPrecipitating = precipitation > 0;
 
     // Easter egg modifications
     const easterEggActive = easterEggState === 'DEMOGORGON' || easterEggState === 'MINDFLAYER';
 
-    // Temperature (modified by easter eggs)
+    // Temperature
     let tempValue = temp;
     let tempStatus = 'STABLE';
     if (easterEggActive) {
@@ -170,7 +217,7 @@ export const useAtmosphericData = (easterEggState = null) => {
     if (humidity > 85) humidityStatus = 'HIGH';
     else if (humidity < 30) humidityStatus = 'LOW';
 
-    // EM Field - based on storm activity and cloud cover
+    // EM Field
     let emFieldValue = '12.4 μT';
     let emFieldStatus = 'NORMAL';
     if (isStormy || easterEggActive) {
@@ -181,7 +228,7 @@ export const useAtmosphericData = (easterEggState = null) => {
       emFieldStatus = 'ELEVATED';
     }
 
-    // Radiation - mostly stable, spikes during storms/easter eggs
+    // Radiation
     let radiationValue = (0.08 + Math.random() * 0.08).toFixed(2);
     let radiationStatus = 'NORMAL';
     if (easterEggActive) {
@@ -192,7 +239,7 @@ export const useAtmosphericData = (easterEggState = null) => {
       radiationStatus = 'ELEVATED';
     }
 
-    // Particle flux - based on precipitation and wind
+    // Particle flux
     const baseFlux = 15000 + (windSpeed * 200) + (precipitation * 5000);
     let fluxValue = (baseFlux + Math.random() * 5000).toExponential(1).toUpperCase();
     let fluxStatus = baseFlux > 25000 ? 'ELEVATED' : baseFlux > 40000 ? 'HIGH' : 'NORMAL';
@@ -202,46 +249,19 @@ export const useAtmosphericData = (easterEggState = null) => {
     }
 
     return {
-      pressure: {
-        value: `${pressure.toFixed(1)} hPa`,
-        status: pressureStatus,
-        raw: pressure,
-      },
-      temperature: {
-        value: `${tempValue.toFixed(1)}°C`,
-        status: tempStatus,
-        raw: tempValue,
-      },
-      humidity: {
-        value: `${humidity}%`,
-        status: humidityStatus,
-        raw: humidity,
-      },
-      emField: {
-        value: emFieldValue,
-        status: emFieldStatus,
-        raw: cloudCover,
-      },
-      radiation: {
-        value: `${radiationValue} μSv/h`,
-        status: radiationStatus,
-        raw: parseFloat(radiationValue),
-      },
-      particleFlux: {
-        value: fluxValue,
-        status: fluxStatus,
-        raw: baseFlux,
-      },
-      windSpeed: {
-        value: `${windSpeed.toFixed(1)} km/h`,
-        raw: windSpeed,
-      },
+      pressure: { value: `${pressure.toFixed(1)} hPa`, status: pressureStatus, raw: pressure },
+      temperature: { value: `${tempValue.toFixed(1)}°C`, status: tempStatus, raw: tempValue },
+      humidity: { value: `${humidity}%`, status: humidityStatus, raw: humidity },
+      emField: { value: emFieldValue, status: emFieldStatus, raw: cloudCover },
+      radiation: { value: `${radiationValue} μSv/h`, status: radiationStatus, raw: parseFloat(radiationValue) },
+      particleFlux: { value: fluxValue, status: fluxStatus, raw: baseFlux },
+      windSpeed: { value: `${windSpeed.toFixed(1)} km/h`, raw: windSpeed },
       weatherCode,
       isLive: true,
       isStormy,
       locationName,
     };
-  }, [atmosphericData, isLive, easterEggState, locationName]);
+  };
 
   return {
     readings: getProcessedReadings(),
@@ -251,7 +271,6 @@ export const useAtmosphericData = (easterEggState = null) => {
     lastFetch,
     location,
     locationName,
-    refetch: fetchAtmospheric,
   };
 };
 
