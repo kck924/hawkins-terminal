@@ -1176,7 +1176,7 @@ const HawkinsTerminal = () => {
           <div style={{ borderBottom: `1px solid ${borderColor}`, paddingBottom: '6px', marginBottom: '8px', fontSize: isMobile ? '11px' : '13px', letterSpacing: isMobile ? '0.5px' : '1px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>{isMobile ? '◢ SEISMIC' : '◢ SEISMIC ACTIVITY'}</span>
             <span style={{ fontSize: isMobile ? '10px' : '13px', color: seismicIsLive ? '#4a8' : dimColor }}>
-              {seismicIsLive ? '● HAWKINS, IN' : '○ SIM'}
+              {seismicIsLive ? '●' : '○'} HAWKINS, IN
             </span>
           </div>
 
@@ -1243,7 +1243,7 @@ const HawkinsTerminal = () => {
           <div style={{ borderBottom: `1px solid ${borderColor}`, paddingBottom: '6px', marginBottom: '8px', fontSize: isMobile ? '11px' : '13px', letterSpacing: isMobile ? '0.5px' : '1px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>{isMobile ? '◢ ATMOS' : '◢ ATMOSPHERIC'}</span>
             <span style={{ fontSize: isMobile ? '10px' : '13px', color: atmosphericIsLive ? '#4a8' : dimColor }}>
-              {atmosphericIsLive ? '● HAWKINS, IN' : '○ SIM'}
+              {atmosphericIsLive ? '●' : '○'} HAWKINS, IN
             </span>
           </div>
 
