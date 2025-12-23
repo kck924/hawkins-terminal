@@ -13,7 +13,15 @@ const trackEvent = (eventName, params = {}) => {
  */
 const CRTMonitorFrame = ({ children }) => {
   const [isMuted, setIsMuted] = useState(true);
+  const [imageLoaded, setImageLoaded] = useState(false);
   const audioRef = useRef(null);
+
+  // Preload the CRT image
+  useEffect(() => {
+    const img = new Image();
+    img.onload = () => setImageLoaded(true);
+    img.src = '/hawkinslabdemo3.jpeg';
+  }, []);
 
   useEffect(() => {
     if (audioRef.current) {
@@ -33,6 +41,45 @@ const CRTMonitorFrame = ({ children }) => {
     height: '68%',
     borderRadius: '1%',
   };
+
+  // Loading screen while image loads
+  if (!imageLoaded) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        width: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: '#0a0a0a',
+        color: '#ffb000',
+        fontFamily: 'VT323, monospace',
+      }}>
+        <div style={{
+          fontSize: '24px',
+          letterSpacing: '4px',
+          marginBottom: '20px',
+          textShadow: '0 0 10px rgba(255,176,0,0.5)',
+        }}>
+          HAWKINS NATIONAL LABORATORY
+        </div>
+        <div style={{
+          fontSize: '16px',
+          opacity: 0.7,
+          animation: 'blink 1s infinite',
+        }}>
+          INITIALIZING TERMINAL...
+        </div>
+        <style>{`
+          @keyframes blink {
+            0%, 50% { opacity: 0.7; }
+            51%, 100% { opacity: 0.3; }
+          }
+        `}</style>
+      </div>
+    );
+  }
 
   return (
     <div style={{

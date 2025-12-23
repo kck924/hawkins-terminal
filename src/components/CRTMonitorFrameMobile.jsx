@@ -14,7 +14,15 @@ const trackEvent = (eventName, params = {}) => {
 const CRTMonitorFrameMobile = ({ children }) => {
   const [isMuted, setIsMuted] = useState(true);
   const [frameless, setFrameless] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
   const audioRef = useRef(null);
+
+  // Preload the CRT frame image
+  useEffect(() => {
+    const img = new Image();
+    img.onload = () => setImageLoaded(true);
+    img.src = '/mobileframe3.jpeg';
+  }, []);
 
   useEffect(() => {
     if (audioRef.current) {
@@ -35,6 +43,47 @@ const CRTMonitorFrameMobile = ({ children }) => {
     height: '70%', // Slightly shorter to fit better on mobile
     borderRadius: '1%',
   };
+
+  // Loading screen while image loads (skip if frameless since no image needed)
+  if (!imageLoaded && !frameless) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        width: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: '#0a0a0a',
+        color: '#ffcc00',
+        fontFamily: 'VT323, monospace',
+      }}>
+        <div style={{
+          fontSize: '18px',
+          letterSpacing: '2px',
+          marginBottom: '16px',
+          textShadow: '0 0 10px rgba(255,204,0,0.5)',
+          textAlign: 'center',
+          padding: '0 20px',
+        }}>
+          HAWKINS NATIONAL LABORATORY
+        </div>
+        <div style={{
+          fontSize: '14px',
+          opacity: 0.7,
+          animation: 'blink 1s infinite',
+        }}>
+          INITIALIZING TERMINAL...
+        </div>
+        <style>{`
+          @keyframes blink {
+            0%, 50% { opacity: 0.7; }
+            51%, 100% { opacity: 0.3; }
+          }
+        `}</style>
+      </div>
+    );
+  }
 
   // Frameless mode - render content fullscreen
   if (frameless) {
