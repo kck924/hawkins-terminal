@@ -1,5 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 
+// Google Analytics event tracking helper
+const trackEvent = (eventName, params = {}) => {
+  if (typeof window !== 'undefined' && window.gtag) {
+    window.gtag('event', eventName, params);
+  }
+};
+
 /**
  * Wraps content in the AI-generated CRT monitor frame image.
  * Positions the terminal content precisely over the screen area.
@@ -98,6 +105,7 @@ const CRTMonitorFrame = ({ children }) => {
           {/* Share on X/Twitter */}
           <button
             onClick={() => {
+              trackEvent('social_share', { platform: 'twitter', device_type: 'desktop' });
               const text = "Just discovered this Stranger Things terminal from Hawkins Lab... 👀🔦";
               const url = window.location.href;
               window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank');
@@ -133,6 +141,7 @@ const CRTMonitorFrame = ({ children }) => {
           {/* Share on Facebook */}
           <button
             onClick={() => {
+              trackEvent('social_share', { platform: 'facebook', device_type: 'desktop' });
               const url = window.location.href;
               window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, '_blank');
             }}
@@ -167,6 +176,7 @@ const CRTMonitorFrame = ({ children }) => {
           {/* Share on Reddit */}
           <button
             onClick={() => {
+              trackEvent('social_share', { platform: 'reddit', device_type: 'desktop' });
               const title = "Stranger Things terminal from Hawkins National Laboratory";
               const url = window.location.href;
               window.open(`https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(title)}`, '_blank');
@@ -204,6 +214,7 @@ const CRTMonitorFrame = ({ children }) => {
           {/* Copy link */}
           <button
             onClick={() => {
+              trackEvent('social_share', { platform: 'copy_link', device_type: 'desktop' });
               navigator.clipboard.writeText(window.location.href);
               alert('Link copied!');
             }}
@@ -236,7 +247,10 @@ const CRTMonitorFrame = ({ children }) => {
 
           {/* Audio toggle */}
           <button
-            onClick={() => setIsMuted(!isMuted)}
+            onClick={() => {
+              trackEvent('audio_toggle', { action: isMuted ? 'unmute' : 'mute', device_type: 'desktop' });
+              setIsMuted(!isMuted);
+            }}
             style={{
               width: '32px',
               height: '32px',

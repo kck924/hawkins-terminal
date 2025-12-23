@@ -27,3 +27,15 @@ yarn-error.log*
 
 # Local development
 *.local
+
+# Development utility scripts
+*.backup
+EDIT_INSTRUCTIONS.txt
+apply_mobile_styles.py
+apply_mobile_updates.sh
+make_responsive.py
+update-*.sh
+update-*.js
+update_*.js
+.vercel
+.env*.local

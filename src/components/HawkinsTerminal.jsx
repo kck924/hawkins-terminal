@@ -5,6 +5,13 @@ import useLocationRisk from '../hooks/useLocationRisk';
 import useGlobalHotZones from '../hooks/useGlobalHotZones';
 import useIsMobile from '../hooks/useIsMobile';
 
+// Google Analytics event tracking helper
+const trackEvent = (eventName, params = {}) => {
+  if (typeof window !== 'undefined' && window.gtag) {
+    window.gtag('event', eventName, params);
+  }
+};
+
 const HawkinsTerminal = () => {
   // Mobile detection
   const isMobile = useIsMobile(900);
@@ -52,6 +59,8 @@ const HawkinsTerminal = () => {
   const glitchAudioRef = useRef(null);
   const demogorgonAudioRef = useRef(null);
   const clockAudioRef = useRef(null);
+  const commandInputRef = useRef(null);
+  const scanInputRef = useRef(null);
 
   // Sinister characters that trigger glitch sound
   const sinisterCharacters = ['DEMOGORGON', 'MINDFLAYER', 'VECNA', 'HENRY', 'BRENNER'];
@@ -65,6 +74,20 @@ const HawkinsTerminal = () => {
     // Also try scrolling the window for mobile view
     window.scrollTo(0, 0);
   }, [currentView, easterEggState]);
+
+  // Auto-focus command input when opened (triggers mobile keyboard)
+  useEffect(() => {
+    if (showCommand && commandInputRef.current) {
+      setTimeout(() => commandInputRef.current?.focus(), 100);
+    }
+  }, [showCommand]);
+
+  // Auto-focus scan input when opened (triggers mobile keyboard)
+  useEffect(() => {
+    if (showScanInput && scanInputRef.current) {
+      setTimeout(() => scanInputRef.current?.focus(), 100);
+    }
+  }, [showScanInput]);
 
   // All available easter eggs - used for tracking completion
   const ALL_EASTER_EGGS = [
@@ -541,13 +564,13 @@ const HawkinsTerminal = () => {
       }
 
       // Function keys for views
-      if (e.key === 'F1') { e.preventDefault(); setCurrentView('DASHBOARD'); }
-      if (e.key === 'F2') { e.preventDefault(); setCurrentView('HOTZONES'); setEasterEggState(null); }
-      if (e.key === 'F3') { e.preventDefault(); setCurrentView('SUBJECTS'); }
-      if (e.key === 'F5') { e.preventDefault(); setCurrentView('SECTORS'); }
-      if (e.key === 'F7') { e.preventDefault(); setCurrentView('GATE'); }
-      if (e.key === 'F8') { e.preventDefault(); setCurrentView('INFO'); }
-      if (e.key === 'F9') { e.preventDefault(); setShowCommand(true); setCommandError(false); }
+      if (e.key === 'F1') { e.preventDefault(); setCurrentView('DASHBOARD'); trackEvent('view_change', { view: 'DASHBOARD', method: 'keyboard' }); }
+      if (e.key === 'F2') { e.preventDefault(); setCurrentView('HOTZONES'); setEasterEggState(null); trackEvent('view_change', { view: 'HOTZONES', method: 'keyboard' }); }
+      if (e.key === 'F3') { e.preventDefault(); setCurrentView('SUBJECTS'); trackEvent('view_change', { view: 'SUBJECTS', method: 'keyboard' }); }
+      if (e.key === 'F5') { e.preventDefault(); setCurrentView('SECTORS'); trackEvent('view_change', { view: 'SECTORS', method: 'keyboard' }); }
+      if (e.key === 'F7') { e.preventDefault(); setCurrentView('GATE'); trackEvent('view_change', { view: 'GATE', method: 'keyboard' }); }
+      if (e.key === 'F8') { e.preventDefault(); setCurrentView('INFO'); trackEvent('view_change', { view: 'INFO', method: 'keyboard' }); }
+      if (e.key === 'F9') { e.preventDefault(); setShowCommand(true); setCommandError(false); trackEvent('command_input_opened', { method: 'keyboard' }); }
       
       // Command input
       if (showCommand) {
@@ -586,6 +609,7 @@ const HawkinsTerminal = () => {
           setShowScanInput(false);
           setScanInputBuffer('');
           setEasterEggState('SCANNING');
+          trackEvent('location_scan', { location: location, method: 'keyboard' });
           scanLocation(location);
         } else if (e.key === 'Backspace') {
           setScanInputBuffer(prev => prev.slice(0, -1));
@@ -723,6 +747,12 @@ const HawkinsTerminal = () => {
     if (!command) {
       return false;
     }
+
+    // Track command submission
+    trackEvent('command_submitted', {
+      command: command,
+      device_type: isMobile ? 'mobile' : 'desktop'
+    });
     if (command === 'ELEVEN' || command === '011') {
       triggerEasterEgg('ELEVEN');
       return true;
@@ -857,6 +887,7 @@ const HawkinsTerminal = () => {
       const location = command.replace(/^SCAN[:\s]+/, '').trim();
       if (location) {
         setEasterEggState('SCANNING');
+        trackEvent('location_scan', { location: location, method: 'command' });
         setLogEntries(prev => [...prev,
           `${formatTime(time)} INITIATING DIMENSIONAL SCAN...`,
           `${formatTime(time)} TARGET: ${location.toUpperCase()}`,
@@ -894,6 +925,14 @@ const HawkinsTerminal = () => {
 
   const triggerEasterEgg = (type) => {
     const isNewDiscovery = !discoveredEasterEggs.has(type);
+
+    // Track easter egg unlock in Google Analytics
+    trackEvent('easter_egg_unlock', {
+      easter_egg_name: type,
+      is_new_discovery: isNewDiscovery,
+      total_discovered: discoveredEasterEggs.size + (isNewDiscovery ? 1 : 0),
+      device_type: isMobile ? 'mobile' : 'desktop'
+    });
 
     // Track this discovery
     if (isNewDiscovery) {
@@ -1035,9 +1074,9 @@ const HawkinsTerminal = () => {
     return '█'.repeat(bars) + '░'.repeat(30 - bars);
   };
 
-  // Styles
-  const baseColor = easterEggState === 'UPSIDE_DOWN' ? '#ff3300' : '#ffb000';
-  const dimColor = easterEggState === 'UPSIDE_DOWN' ? '#801a00' : '#805800';
+  // Styles - brighter amber on mobile for better readability
+  const baseColor = easterEggState === 'UPSIDE_DOWN' ? '#ff3300' : (isMobile ? '#ffcc00' : '#ffb000');
+  const dimColor = easterEggState === 'UPSIDE_DOWN' ? '#801a00' : (isMobile ? '#aa8800' : '#805800');
   const bgColor = easterEggState === 'UPSIDE_DOWN' ? '#0a0205' : '#1a1205';
   const borderColor = easterEggState === 'UPSIDE_DOWN' ? '#3d0a1a' : '#3d2e0a';
 
@@ -1648,7 +1687,7 @@ const HawkinsTerminal = () => {
                             </div>
                             <div style={{
                               fontSize: isMobile ? '8px' : '9px',
-                              color: '#664400',
+                              color: isMobile ? '#cc9900' : '#664400',
                             }}>
                               🔒 {isMobile ? 'LOCKED' : 'CLASSIFIED'}
                             </div>
@@ -1672,7 +1711,7 @@ const HawkinsTerminal = () => {
             textAlign: 'center',
           }}>
             <div style={{ marginBottom: '4px' }}>💡 USE [F9] COMMAND INPUT TO UNLOCK DOSSIERS</div>
-            <div style={{ fontSize: '10px', color: '#664400' }}>
+            <div style={{ fontSize: '10px', color: isMobile ? '#cc9900' : '#664400' }}>
               TRY CHARACTER NAMES, CODENAMES, OR DESIGNATIONS
             </div>
           </div>
@@ -11008,7 +11047,7 @@ const HawkinsTerminal = () => {
           background: bgColor,
           position: 'sticky',
           bottom: 0,
-          zIndex: 15,
+          zIndex: 50,
           borderTop: `1px solid ${borderColor}`,
           paddingTop: '6px',
           flexShrink: 0,
@@ -11031,7 +11070,7 @@ const HawkinsTerminal = () => {
               <span>{isMobile ? 'T7 | SL3 | TOP SECRET' : 'TERMINAL 7 | SUBLEVEL 3 | CLEARANCE: TOP SECRET'}</span>
               {discoveredEasterEggs.size > 0 && !isMobile && (
                 <span style={{
-                  color: discoveredEasterEggs.size === TOTAL_EASTER_EGGS ? '#5c5' : '#665500',
+                  color: discoveredEasterEggs.size === TOTAL_EASTER_EGGS ? '#5c5' : '#aa8800',
                   opacity: 0.7,
                 }}>
                   | {discoveredEasterEggs.size}/{TOTAL_EASTER_EGGS} FILES ACCESSED
@@ -11066,25 +11105,47 @@ const HawkinsTerminal = () => {
             return (
               <button
                 key={item.label}
-                onClick={() => {
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
                   if (item.action === 'command') {
                     setShowCommand(true);
+                    trackEvent('command_input_opened', { method: 'nav_button' });
                   } else if (item.action === 'scan') {
                     setShowScanInput(true);
+                    trackEvent('scan_input_opened', { method: 'nav_button' });
                   } else if (item.view) {
                     setCurrentView(item.view);
                     setEasterEggState(null);
                     clearScan();
+                    trackEvent('view_change', { view: item.view, method: 'nav_button' });
+                  }
+                }}
+                onTouchEnd={(e) => {
+                  e.preventDefault();
+                  if (item.action === 'command') {
+                    setShowCommand(true);
+                    trackEvent('command_input_opened', { method: 'nav_button' });
+                  } else if (item.action === 'scan') {
+                    setShowScanInput(true);
+                    trackEvent('scan_input_opened', { method: 'nav_button' });
+                  } else if (item.view) {
+                    setCurrentView(item.view);
+                    setEasterEggState(null);
+                    clearScan();
+                    trackEvent('view_change', { view: item.view, method: 'nav_button' });
                   }
                 }}
                 style={{
                   background: isActive ? 'rgba(255,176,0,0.3)' : 'rgba(255,176,0,0.08)',
                   border: `1px solid ${item.highlight ? '#5c5' : isActive ? baseColor : '#806000'}`,
                   color: item.highlight ? '#5c5' : isActive ? baseColor : '#c90',
-                  padding: isMobile ? '6px 4px' : '4px 8px',
+                  padding: isMobile ? '8px 6px' : '4px 8px',
                   fontSize: isMobile ? '10px' : '14px',
                   fontFamily: '"VT323", monospace',
                   cursor: 'pointer',
+                  touchAction: 'manipulation',
+                  WebkitTapHighlightColor: 'transparent',
                   transition: 'all 0.1s',
                   textShadow: isActive ? `0 0 8px ${baseColor}` : 'none',
                   minHeight: isMobile ? '32px' : 'auto',
@@ -11227,8 +11288,48 @@ const HawkinsTerminal = () => {
                 padding: isMobile ? '6px' : '10px',
                 background: bgColor,
                 border: `1px solid ${commandError ? '#ff4444' : borderColor}`,
+                position: 'relative',
               }}>
                 {'>'} {commandBuffer}<span style={{ animation: 'blink 0.5s infinite' }}>█</span>
+                {/* Hidden input to trigger mobile keyboard */}
+                <input
+                  ref={commandInputRef}
+                  type="text"
+                  value={commandBuffer}
+                  onChange={(e) => {
+                    setCommandBuffer(e.target.value.toUpperCase().slice(0, 20));
+                    setCommandError(false);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const success = processCommand(commandBuffer);
+                      if (success) {
+                        setCommandBuffer('');
+                        setShowCommand(false);
+                        setCommandError(false);
+                      } else {
+                        setCommandError(true);
+                      }
+                    } else if (e.key === 'Escape') {
+                      setShowCommand(false);
+                      setCommandBuffer('');
+                      setCommandError(false);
+                    }
+                  }}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    opacity: 0,
+                    fontSize: '16px', // Prevents iOS zoom
+                    caretColor: 'transparent',
+                  }}
+                  autoComplete="off"
+                  autoCapitalize="characters"
+                  spellCheck={false}
+                />
               </div>
               {commandError && (
                 <div style={{
@@ -11242,11 +11343,39 @@ const HawkinsTerminal = () => {
                 </div>
               )}
               <div style={{ color: dimColor, fontSize: isMobile ? '8px' : '11px', marginTop: isMobile ? '8px' : '12px', borderTop: `1px solid ${borderColor}`, paddingTop: isMobile ? '6px' : '8px' }}>
-                <div style={{ marginBottom: '4px', color: '#997700' }}>TRY: ELEVEN • DEMOGORGON • BARB</div>
-                <div style={{ color: '#555500' }}>TYPE "RESET" TO CLEAR VISUAL EFFECTS</div>
+                <div style={{ marginBottom: '4px', color: isMobile ? '#cc9900' : '#997700' }}>TRY: ELEVEN • DEMOGORGON • BARB</div>
+                <div style={{ color: isMobile ? '#998800' : '#555500' }}>TYPE "RESET" TO CLEAR VISUAL EFFECTS</div>
               </div>
+              {isMobile && (
+                <button
+                  onClick={() => {
+                    const success = processCommand(commandBuffer);
+                    if (success) {
+                      setCommandBuffer('');
+                      setShowCommand(false);
+                      setCommandError(false);
+                    } else {
+                      setCommandError(true);
+                    }
+                  }}
+                  style={{
+                    width: '100%',
+                    marginTop: '10px',
+                    padding: '12px',
+                    background: 'rgba(255,176,0,0.2)',
+                    border: `2px solid ${baseColor}`,
+                    color: baseColor,
+                    fontSize: '14px',
+                    fontFamily: '"VT323", monospace',
+                    cursor: 'pointer',
+                    touchAction: 'manipulation',
+                  }}
+                >
+                  SUBMIT COMMAND
+                </button>
+              )}
               <div style={{ color: dimColor, fontSize: isMobile ? '9px' : '13px', marginTop: isMobile ? '6px' : '10px' }}>
-                {isMobile ? '[ENTER] SUBMIT · [TAP OUTSIDE] CANCEL' : '[ENTER] SUBMIT   [ESC/CLICK OUTSIDE] CANCEL'}
+                {isMobile ? '[TAP OUTSIDE TO CANCEL]' : '[ENTER] SUBMIT   [ESC/CLICK OUTSIDE] CANCEL'}
               </div>
             </div>
           </div>
@@ -11303,12 +11432,75 @@ const HawkinsTerminal = () => {
                 background: '#0a120a',
                 border: '1px solid #385',
                 letterSpacing: isMobile ? '0.5px' : '1px',
+                position: 'relative',
               }}>
                 {'>'} {scanInputBuffer}<span style={{ animation: 'blink 0.5s infinite' }}>█</span>
+                {/* Hidden input to trigger mobile keyboard */}
+                <input
+                  ref={scanInputRef}
+                  type="text"
+                  value={scanInputBuffer}
+                  onChange={(e) => {
+                    setScanInputBuffer(e.target.value.slice(0, 50));
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && scanInputBuffer.trim()) {
+                      const location = scanInputBuffer.trim();
+                      setShowScanInput(false);
+                      setScanInputBuffer('');
+                      setEasterEggState('SCANNING');
+                      trackEvent('location_scan', { location: location, method: 'mobile_input' });
+                      scanLocation(location);
+                    } else if (e.key === 'Escape') {
+                      setShowScanInput(false);
+                      setScanInputBuffer('');
+                    }
+                  }}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    opacity: 0,
+                    fontSize: '16px', // Prevents iOS zoom
+                    caretColor: 'transparent',
+                  }}
+                  autoComplete="off"
+                  spellCheck={false}
+                />
               </div>
+              {isMobile && (
+                <button
+                  onClick={() => {
+                    if (scanInputBuffer.trim()) {
+                      const location = scanInputBuffer.trim();
+                      setShowScanInput(false);
+                      setScanInputBuffer('');
+                      setEasterEggState('SCANNING');
+                      trackEvent('location_scan', { location: location, method: 'mobile_button' });
+                      scanLocation(location);
+                    }
+                  }}
+                  style={{
+                    width: '100%',
+                    marginTop: '10px',
+                    padding: '12px',
+                    background: 'rgba(68,170,136,0.2)',
+                    border: '2px solid #4a8',
+                    color: '#4a8',
+                    fontSize: '14px',
+                    fontFamily: '"VT323", monospace',
+                    cursor: 'pointer',
+                    touchAction: 'manipulation',
+                  }}
+                >
+                  INITIATE SCAN
+                </button>
+              )}
               <div style={{ color: '#385', fontSize: isMobile ? '9px' : '12px', marginTop: isMobile ? '6px' : '12px', lineHeight: '1.5' }}>
                 {isMobile ? (
-                  <>EXAMPLES: "HAWKINS, IN" • "90210"<br/>[ENTER] SCAN · [TAP OUTSIDE] ABORT</>
+                  <>EXAMPLES: "HAWKINS, IN" • "90210"<br/>[TAP OUTSIDE TO ABORT]</>
                 ) : (
                   <>EXAMPLES: "HAWKINS, INDIANA" • "90210" • "TOKYO"<br/>[ENTER] INITIATE SCAN   [ESC/CLICK OUTSIDE] ABORT</>
                 )}
