@@ -54,7 +54,36 @@
     </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Fallback content for in-app browsers that struggle with JS -->
+      <div id="loading-fallback" style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0a0a0a;color:#ffb000;font-family:monospace;text-align:center;padding:20px;">
+        <div style="font-size:18px;letter-spacing:2px;margin-bottom:16px;">HAWKINS NATIONAL LABORATORY</div>
+        <div style="font-size:14px;opacity:0.7;">INITIALIZING TERMINAL...</div>
+        <noscript>
+          <div style="margin-top:20px;color:#ff6600;">
+            JavaScript is required to access this terminal.<br/>
+            <a href="https://hawkinslabterminal.com" style="color:#ffb000;">Open in browser →</a>
+          </div>
+        </noscript>
+      </div>
+    </div>
+    <script>
+      // Detect LinkedIn in-app browser and suggest opening in real browser
+      (function() {
+        var ua = navigator.userAgent || '';
+        var isLinkedInApp = ua.indexOf('LinkedInApp') > -1 || ua.indexOf('JEUI') > -1;
+        if (isLinkedInApp) {
+          var root = document.getElementById('root');
+          root.innerHTML = '<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0a0a0a;color:#ffb000;font-family:monospace;text-align:center;padding:20px;">' +
+            '<div style="font-size:18px;letter-spacing:2px;margin-bottom:16px;">HAWKINS NATIONAL LABORATORY</div>' +
+            '<div style="font-size:14px;margin-bottom:24px;">TERMINAL 7 - SUBLEVEL 3</div>' +
+            '<div style="font-size:12px;color:#805800;margin-bottom:20px;">For the full classified experience:</div>' +
+            '<a href="https://hawkinslabterminal.com" target="_blank" rel="noopener" style="display:inline-block;padding:12px 24px;background:rgba(255,176,0,0.1);border:2px solid #ffb000;color:#ffb000;text-decoration:none;font-size:14px;">OPEN IN BROWSER →</a>' +
+            '<div style="font-size:10px;color:#555;margin-top:24px;">LinkedIn\\'s app browser has limited capabilities.</div>' +
+            '</div>';
+        }
+      })();
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
